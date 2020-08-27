@@ -1,0 +1,55 @@
+{
+  "version": "0.0.0",
+  "name": "trace-router",
+  "description": "The router for your app",
+  "author": "doasync",
+  "module": "dist/trace-router.esm.js",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
+  "scripts": {
+    "start": "tsdx watch",
+    "build": "tsdx build",
+    "test": "tsdx test --passWithNoTests",
+    "lint": "tsdx lint",
+    "prepare": "tsdx build"
+  },
+  "peerDependencies": {
+    "react": ">=16"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "tsdx lint"
+    }
+  },
+  "prettier": {
+    "printWidth": 80,
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "es5"
+  },
+  "devDependencies": {
+    "@types/react": "^16.9.48",
+    "@types/react-dom": "^16.9.8",
+    "husky": "^4.2.5",
+    "np": "^6.4.0",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
+    "tsdx": "^0.13.3",
+    "tslib": "^2.0.1",
+    "typescript": "^4.0.2"
+  },
+  "dependencies": {
+    "effector": "^21.2.2",
+    "effector-react": "^21.0.4",
+    "history": "^5.0.0",
+    "path-parser": "^6.1.0"
+  }
+}
