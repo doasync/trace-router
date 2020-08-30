@@ -94,7 +94,7 @@ Use can apply default router for Links:
 
 ```jsx
 import history from 'history/browser';
-import { applyRouter, createRouter } from '~/lib/router';
+import { applyRouter, createRouter } from 'trace-router';
 export const router = createRouter({ history });
 
 applyRouter(router);

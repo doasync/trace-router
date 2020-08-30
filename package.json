@@ -1,12 +1,16 @@
 {
   "version": "0.2.0",
   "name": "trace-router",
-  "description": "The router for your app",
+  "description": "The next generation router for your app",
   "author": "doasync",
   "module": "dist/trace-router.esm.js",
   "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/doasync/trace-router.git"
+  },
   "files": [
     "dist",
     "src"
