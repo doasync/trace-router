@@ -10,92 +10,174 @@ yarn add trace-router
 
 ### Examples
 
+Create router:
+
+```js
+import history from 'history/browser';
+import { createRouter } from 'trace-router';
+
+export const router = createRouter({ history });
+````
+
 Create routes:
 
 ```js
-import { createRoute } from 'trace-router';
+// This route is used only for redirection below
+export const exactRoot = router.add({ path: '/' });
 
-export const root = createRoute({ path: '/', exact: true });
-export const about = createRoute({ path: '/about' });
-export const joinUs = createRoute({ path: '/join-us' });
+// User section
+export const user = router.add('/user(/.*)?'); // parent
+export const userProfile = router.add('/user');
+export const userTickets = router.add('/user/tickets');
+export const userTicket = router.add<{ id: number }>('/user/tickets/:id');
+
+// Info section
+export const joinUs = router.add('/join-us');
+export const about = router.add('/about');
+export const privacy = router.add('/privacy');
+
+// Merge routes to create a parent route
+// When you can't create common path
+export const info = router.merge([
+  joinUs,
+  about,
+  privacy,
+]);
+
+// Redirect from "/" to "/user"
+exactRoot.visible.watch((visible) => {
+  if (visible) {
+    router.redirect('/user');
+  }
+});
 ````
 
 Use routes:
 
 ```jsx
-<main className="content">
-  {useRoute(root) && <Root />}
-  {useRoute(joinUs) && <JoinUs />}
-  {useRoute(about) && <About />}
-</main>
+export const Root = () => (
+  <>
+    {useRoute(user) && <UserPage />}
+    {useRoute(info) && <InfoPage />}
+    {useStore(router.noMatches) && <NotFound />}
+  </>
+);
+
+export const UserPage = () => (
+  <AppFrame>
+    <UserTemplate>
+      {useRoute(userProfile) && <UserProfile />}
+      {useRoute(userTickets) && <UserTickets />}
+      {useRoute(userTicket) && <UserTicket />}
+    </UserTemplate>
+  </AppFrame>
+);
+
+export const InfoPage = () => (
+  <AppFrame>
+    <InfoTemplate>
+      {useRoute(joinUs) && <JoinUs />}
+      {useRoute(about) && <About />}
+      {useRoute(privacy) && <Privacy />}
+    </InfoTemplate>
+  </AppFrame>
+);
 ````
 
 Use links:
 
 ```jsx
-<Link to="/about">About</Link>
+<Link to="/about" router={router}>About</Link>
+````
+
+Use can apply default router for Links:
+
+```jsx
+import history from 'history/browser';
+import { applyRouter, createRouter } from '~/lib/router';
+export const router = createRouter({ history });
+
+applyRouter(router);
+````
+
+And use Links without router:
+
+```jsx
+<Link to="/join-us">Join Us</Link>
 ````
 
 You can use `navigate` method:
 
 ```jsx
-export const Link = ({ to, children }) => (
-  <button onClick={() => navigate(to)}>
+export const Button = ({ to, children }) => (
+  <button onClick={() => router.navigate(to)}>
     {children}
   </button>
 );
 ````
 
-### Exports
-
-All exported stores (prefixed with $) are `effector` stores.
-
-A route created by `createRoute` factory is also a store.
-
-`navigate` and `onHistoryUpdate` are events.
-
-```js
-export {
-  onHistoryUpdate,
-  $pathname,
-  $search,
-  $hash,
-  $state,
-  $query,
-  $resource,
-  $notFound,
-  navigate,
-  createRoute,
-} from './router';
-
-export {
-  useRoute, 
-  useRouteStore, 
-  useStore, 
-  Route, 
-  Link 
-} from './react';
-```
+There is also `replace`, `shift`, `back` and `forward` methods
 
 ### Types
 
-```ts
-// createRoute params
-export type RouteParams = {
-  path?: string;
-  exact?: boolean;
-  caseSensitive?: boolean;
-  redirectTo?: string;
-  parent?: Store<Route>;
-};
+<details>
+<summary>
+  Router
+</summary>
 
-// Route state
-export type Route<T = Record<string, unknown>> = {
-  pattern: Path<T> | null;
-  params: TestMatch<T>;
-  isVisible: boolean;
+```ts
+export type Router<Q extends Query = Query, S extends State = State> = {
+  history: MemoryHistory<S>;
+  historyUpdated: Event<Update<S>>;
+  historyUpdate: Store<Update<S>>;
+  navigate: Event<ToLocation<S>>;
+  redirect: Event<ToLocation<S>>;
+  shift: Event<Delta>;
+  back: Event<void>;
+  forward: Event<void>;
+  location: Store<Location<S>>;
+  action: Store<Action>;
+  pathname: Store<Pathname>;
+  search: Store<Search>;
+  hash: Store<Hash>;
+  state: Store<S>;
+  key: Store<Key>;
+  resource: Store<Resource>;
+  query: Store<Q>;
+  hasMatches: Store<boolean>;
+  noMatches: Store<boolean>;
+  add: <P extends Params = Params>(
+    pathConfig: Pattern | RouteConfig
+  ) => Route<P>;
+  merge: <T extends Route[]>(routes: T) => MergedRoute;
+  none: <T extends Route[]>(routes: T) => MergedRoute;
 };
 ```
+
+</details>
+
+<details>
+<summary>
+  Route
+</summary>
+
+```ts
+export type Route<P extends Params = Params> = {
+  visible: Store<boolean>;
+  params: Store<null | P>;
+  config: RouteConfig;
+};
+```
+
+</details>
+
+### Exports
+
+```ts
+export { createRouter, applyRouter } from './router';
+
+export { useRoute, Route, Link } from './react';
+````
 
 ### Docs
 

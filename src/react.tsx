@@ -1,36 +1,35 @@
-import { Store } from 'effector';
 import { useStore } from 'effector-react';
 import React, { ReactNode } from 'react';
 
-import { navigate } from './router';
-import { Route as RouteType } from './types';
-
-export const useRoute = ($route: Store<RouteType>): boolean =>
-  useStore($route).isVisible;
-
-export const useRouteStore = <T extends unknown>(
-  $route: Store<RouteType<T>>
-): RouteType<T> => useStore($route);
-
-export { useStore };
+import { routerRef } from './router';
+import { MergedRoute, Route as RouteType, Router } from './types';
 
 type RouteProps = {
-  of: Store<RouteType>;
+  of: RouteType;
   children: ReactNode;
 };
 
-export const Route = ({ of, children }: RouteProps): JSX.Element => (
-  <>{useRoute(of) && children}</>
+export const useRoute = (route: RouteType | MergedRoute): boolean =>
+  useStore(route.visible);
+
+// TODO: Relative navigation
+export const Route = ({ of: route, children }: RouteProps): JSX.Element => (
+  <>{useStore(route.visible) && children}</>
 );
 
 type LinkProps = {
   to: string;
   children: ReactNode;
-  className: string;
+  className?: string;
+  router?: Router;
 };
 
-export const Link = ({ to, children, className }: LinkProps) => (
-  <button type="button" className={className} onClick={() => navigate(to)}>
+export const Link = ({ to, router, children, className }: LinkProps) => (
+  <button
+    type="button"
+    className={className}
+    onClick={() => (routerRef.current ?? router)?.navigate(to)}
+  >
     {children}
   </button>
 );
