@@ -1,16 +1,22 @@
 # Trace Router
 
-The router for your app
+The next generation router for your app
 
 ### Installation
 
 ```
-yarn add trace-router
+yarn add effector trace-router
+```
+
+### Exports
+
+```ts
+export { createRouter } from './router';
 ```
 
 ### Examples
 
-Create router:
+Create a router:
 
 ```js
 import history from 'history/browser';
@@ -47,12 +53,12 @@ export const info = router.merge([
 // Redirect from "/" to "/user"
 exactRoot.visible.watch((visible) => {
   if (visible) {
-    router.redirect('/user');
+    user.redirect();
   }
 });
 ````
 
-Use routes:
+Use routes in React (`trace-router-react`):
 
 ```jsx
 export const Root = () => (
@@ -84,39 +90,56 @@ export const InfoPage = () => (
 );
 ````
 
-Use links:
+You can also use `Route` component instead of a hook:
+
+```tsx
+<Route of={map} component={MapPage} />
+```
+
+Use links to navigate routes directly:
 
 ```jsx
-<Link to="/about" router={router}>About</Link>
+<Link to={about}>About</Link>
 ````
 
-Use can apply default router for Links:
+Use can add params to the route (if it has ones):
 
 ```jsx
-import history from 'history/browser';
-import { applyRouter, createRouter } from 'trace-router';
-export const router = createRouter({ history });
-
-applyRouter(router);
+<Link to={userTicket} params={{ id: 100 }}>Month</Link>
 ````
 
-And use Links without router:
+The above link compiles to something like:
 
 ```jsx
-<Link to="/join-us">Join Us</Link>
+<a href="/user-tiket/100" onClick={/* prevent default & navigate */}>Join Us</a>
 ````
 
-You can use `navigate` method:
+Here is how you compile route to a `string`:
 
 ```jsx
-export const Button = ({ to, children }) => (
-  <button onClick={() => router.navigate(to)}>
-    {children}
-  </button>
-);
+const href = route.compile({
+  params: { id: 100 },
+  query: {
+    lang: 'ru'
+  },
+  hash: '#description',
+})
 ````
 
-There is also `replace`, `shift`, `back` and `forward` methods
+Manual route navigation:
+
+```jsx
+<Button onClick={() => product.navigate({ id: '100' })} />
+````
+
+or `redirect` + `compile` as an example:
+
+```jsx
+<Button onClick={() => product.router.redirect({
+  to: product.compile({ params: { id: '100' } }),
+  state: { back }
+})} />
+````
 
 ### Types
 
@@ -126,8 +149,9 @@ There is also `replace`, `shift`, `back` and `forward` methods
 </summary>
 
 ```ts
+
 export type Router<Q extends Query = Query, S extends State = State> = {
-  history: MemoryHistory<S>;
+  history: History<S>;
   historyUpdated: Event<Update<S>>;
   historyUpdate: Store<Update<S>>;
   navigate: Event<ToLocation<S>>;
@@ -148,7 +172,7 @@ export type Router<Q extends Query = Query, S extends State = State> = {
   noMatches: Store<boolean>;
   add: <P extends Params = Params>(
     pathConfig: Pattern | RouteConfig
-  ) => Route<P>;
+  ) => Route<P, Router<Q, S>>;
   merge: <T extends Route[]>(routes: T) => MergedRoute;
   none: <T extends Route[]>(routes: T) => MergedRoute;
 };
@@ -162,22 +186,60 @@ export type Router<Q extends Query = Query, S extends State = State> = {
 </summary>
 
 ```ts
-export type Route<P extends Params = Params> = {
+export type Route<P extends Params = Params, R = Router> = {
   visible: Store<boolean>;
   params: Store<null | P>;
   config: RouteConfig;
+  compile: (compileConfig?: CompileConfig<P>) => string;
+  router: R extends Router<infer Q, infer S> ? Router<Q, S> : never;
+  navigate: Event<P | void>;
+  redirect: Event<P | void>;
 };
 ```
 
 </details>
 
-### Exports
+<details>
+
+<summary>
+  Other typings
+</summary>
 
 ```ts
-export { createRouter, applyRouter } from './router';
+export type ToLocation<S extends State = State> =
+  | string
+  | { to?: To; state?: S };
+export type Delta = number;
+export type Resource = string;
+export type Pattern = string;
+export interface Query extends ObjectString {}
+export interface Params extends ObjectUnknown {}
 
-export { useRoute, Route, Link } from './react';
-````
+export type RouterConfig<S extends State> = {
+  history?: History<S> | MemoryHistory<S>;
+};
+
+export type RouteConfig = {
+  path: Pattern;
+  matchOptions?: ParseOptions & TokensToRegexpOptions & RegexpToFunctionOptions;
+};
+
+export type CompileConfig<P extends Params = Params> = {
+  params?: P;
+  query?: string[][] | Record<string, string> | string | URLSearchParams;
+  hash?: string;
+  options?: ParseOptions & TokensToFunctionOptions;
+};
+
+export type MergedRoute = {
+  visible: Store<boolean>;
+  routes: Route[];
+  configs: RouteConfig[];
+};
+
+```
+
+</details>
 
 ### Docs
 
