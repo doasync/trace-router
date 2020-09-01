@@ -1,3 +1,3 @@
-export { createRouter, applyRouter } from './router';
+export { createRouter } from './router';
 
 export { useRoute, Route, Link } from './react';

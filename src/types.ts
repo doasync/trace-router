@@ -15,13 +15,17 @@ import {
 import {
   ParseOptions,
   RegexpToFunctionOptions,
+  TokensToFunctionOptions,
   TokensToRegexpOptions,
 } from 'path-to-regexp';
 
+export interface ObjectAny {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
 export interface ObjectUnknown {
   [key: string]: unknown;
 }
-
 export interface ObjectString {
   [key: string]: unknown;
 }
@@ -32,11 +36,11 @@ export type ToLocation<S extends State = State> =
 export type Delta = number;
 export type Resource = string;
 export type Pattern = string;
-export type Query = ObjectString;
-export type Params = ObjectUnknown;
+export interface Query extends ObjectString {}
+export interface Params extends ObjectUnknown {}
 
-export type RouterConfig = {
-  history?: History | MemoryHistory;
+export type RouterConfig<S extends State> = {
+  history?: History<S> | MemoryHistory<S>;
 };
 
 export type RouteConfig = {
@@ -44,10 +48,21 @@ export type RouteConfig = {
   matchOptions?: ParseOptions & TokensToRegexpOptions & RegexpToFunctionOptions;
 };
 
-export type Route<P extends Params = Params> = {
+export type CompileConfig<P extends Params = Params> = {
+  params?: P;
+  query?: string[][] | Record<string, string> | string | URLSearchParams;
+  hash?: string;
+  options?: ParseOptions & TokensToFunctionOptions;
+};
+
+export type Route<P extends Params = Params, R = Router> = {
   visible: Store<boolean>;
   params: Store<null | P>;
   config: RouteConfig;
+  compile: (compileConfig?: CompileConfig<P>) => string;
+  router: R extends Router<infer Q, infer S> ? Router<Q, S> : never;
+  navigate: Event<P | void>;
+  redirect: Event<P | void>;
 };
 
 export type MergedRoute = {
@@ -57,7 +72,7 @@ export type MergedRoute = {
 };
 
 export type Router<Q extends Query = Query, S extends State = State> = {
-  history: MemoryHistory<S>;
+  history: History<S>;
   historyUpdated: Event<Update<S>>;
   historyUpdate: Store<Update<S>>;
   navigate: Event<ToLocation<S>>;
@@ -78,7 +93,7 @@ export type Router<Q extends Query = Query, S extends State = State> = {
   noMatches: Store<boolean>;
   add: <P extends Params = Params>(
     pathConfig: Pattern | RouteConfig
-  ) => Route<P>;
+  ) => Route<P, Router<Q, S>>;
   merge: <T extends Route[]>(routes: T) => MergedRoute;
   none: <T extends Route[]>(routes: T) => MergedRoute;
 };

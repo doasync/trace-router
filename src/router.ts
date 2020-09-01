@@ -1,19 +1,19 @@
 import { combine, createEvent, createStore, Event, Store } from 'effector';
 import {
   createMemoryHistory,
-  Location,
-  MemoryHistory,
+  History,
   parsePath,
   PartialLocation,
-  Path,
   State,
   Update,
 } from 'history';
-import { match as createMatch } from 'path-to-regexp';
+import { compile as createCompile, match as createMatch } from 'path-to-regexp';
 
 import {
+  CompileConfig,
   Delta,
   MergedRoute,
+  ObjectAny,
   Params,
   Query,
   Route,
@@ -23,41 +23,16 @@ import {
   ToLocation,
 } from './types';
 
-export const throwError = (message: string): Error => {
-  throw new Error(message);
-};
-
-const getResource = ({ pathname, search, hash }: Path) =>
-  `${pathname}${search}${hash}`;
-
-const normalizeLocation = <S extends State = State>(
-  toLocation: ToLocation<S>
-): PartialLocation<S> => {
-  const { to, state } =
-    typeof toLocation === 'string'
-      ? { to: toLocation, state: undefined }
-      : toLocation;
-
-  if (to == null && state == null)
-    throwError('router: to or state should be present');
-
-  const path = typeof to === 'string' ? parsePath(to) : to;
-
-  return { ...path, state };
-};
-
-const shouldUpdateLocation = (
-  current: Location,
-  target: PartialLocation
+export const shouldUpdate = (
+  current: ObjectAny,
+  target: ObjectAny
 ): boolean => {
-  const targetKeys = Object.keys(target) as Array<keyof typeof target>;
-
-  for (const key of targetKeys) {
+  for (const key in target) {
+    // noinspection JSUnfilteredForInLoop
     if (key in current && target[key] !== current[key]) {
       return true;
     }
   }
-
   return false;
 };
 
@@ -69,29 +44,65 @@ const onImmediate = <S, T>(
   const update = createEvent<T>();
   store.on(update, reducer);
   trigger.watch(update);
-
   return store;
+};
+
+const normalizeLocation = <S extends State = State>(
+  toLocation: ToLocation<S>
+): PartialLocation<S> => {
+  const { to, state = null } =
+    typeof toLocation === 'string'
+      ? { to: toLocation, state: null }
+      : toLocation;
+  const path = typeof to === 'string' ? parsePath(to) : to;
+  return { ...path, state: state as S };
 };
 
 const createRoute = <R, P extends Params = Params>(
   router: R extends Router<infer Q, infer S> ? Router<Q, S> : never,
   config: RouteConfig
-): Route<P> => {
+): Route<P, R> => {
   const { path, matchOptions } = config;
   const match = createMatch<P>(path, matchOptions);
-
+  const navigate = createEvent<P | void>();
+  const redirect = createEvent<P | void>();
   const $params = createStore<P | null>(null);
   const $visible = $params.map(Boolean);
 
   onImmediate($params, router.pathname, (_, pathname) => {
     const result = match(pathname);
     return result ? result.params : null;
-  }).reset(router.historyUpdated);
+  }).reset(router.pathname);
+
+  const compile = ({
+    params,
+    query,
+    hash,
+    options,
+  }: CompileConfig<P> = {}): string => {
+    const queryString = String(new URLSearchParams(query));
+    const pathname = createCompile<P>(config.path, options)(params);
+    const search = queryString ? `?${queryString}` : '';
+    const hashSign = !hash || hash.startsWith('#') ? '' : `#${hash}`;
+    return `${pathname}${search}${hashSign}${hash ?? ''}`;
+  };
+
+  navigate.watch(params =>
+    router.navigate(compile({ params: params as P | undefined }))
+  );
+
+  redirect.watch(params =>
+    router.redirect(compile({ params: params as P | undefined }))
+  );
 
   return {
     visible: $visible,
     params: $params,
     config,
+    compile,
+    router,
+    navigate,
+    redirect,
   };
 };
 
@@ -117,8 +128,8 @@ const createMergedRoute = (routes: Route[]): MergedRoute => {
 
 export const createRouter = <Q extends Query = Query, S extends State = State>({
   history: userHistory,
-}: RouterConfig = {}): Router<Q, S> => {
-  const history = (userHistory ?? createMemoryHistory()) as MemoryHistory<S>;
+}: RouterConfig<S> = {}): Router<Q, S> => {
+  const history = (userHistory ?? createMemoryHistory()) as History<S>;
   const historyUpdated = createEvent<Update<S>>();
   const $historyUpdate = createStore<Update<S>>({
     location: history.location,
@@ -138,14 +149,15 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
   const $hash = $location.map(location => location.hash);
   const $state = $location.map(location => location.state);
   const $key = $location.map(location => location.key);
-  const $resource = $location.map(getResource);
-
+  const $resource = $location.map(
+    ({ pathname, search, hash }) => `${pathname}${search}${hash}`
+  );
   const $query = $search.map(
     // @ts-ignore
     search => Object.fromEntries(new URLSearchParams(search)) as Q
   );
 
-  const $hasMatches = createStore(false).reset(historyUpdated);
+  const $hasMatches = createStore(false);
   const $noMatches = $hasMatches.map(hasMatches => !hasMatches);
 
   history.listen(historyUpdated);
@@ -154,15 +166,15 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
 
   $location.watch(navigate, (location, toLocation) => {
     const newLocation = normalizeLocation<S>(toLocation);
-    if (shouldUpdateLocation(location, newLocation)) {
+    if (shouldUpdate(location, newLocation)) {
       const { state, ...path } = newLocation;
       history.push(path, state);
     }
   });
 
   $location.watch(redirect, (location, toLocation) => {
-    const newLocation = normalizeLocation(toLocation);
-    if (shouldUpdateLocation(location, newLocation)) {
+    const newLocation = normalizeLocation<S>(toLocation);
+    if (shouldUpdate(location, newLocation)) {
       const { state, ...path } = newLocation;
       history.replace(path, state);
     }
@@ -173,7 +185,7 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
   });
 
   const connectRoute = <P extends Params = Params>(
-    route: Route<P> | MergedRoute
+    route: Route<P, unknown> | MergedRoute
   ): void => {
     onImmediate(
       $hasMatches,
@@ -207,7 +219,7 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
 
     add: <P extends Params = Params>(
       pathConfig: string | RouteConfig
-    ): Route<P> => {
+    ): Route<P, Router<Q, S>> => {
       const routeConfig =
         typeof pathConfig === 'string' ? { path: pathConfig } : pathConfig;
       const route = createRoute<typeof router, P>(router, routeConfig);
@@ -229,12 +241,4 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
   };
 
   return router;
-};
-
-// TODO: Remove
-export const routerRef: { current: Router | null } = { current: null };
-
-// TODO: Use Context instead
-export const applyRouter = (router: Router): void => {
-  routerRef.current = router;
 };
