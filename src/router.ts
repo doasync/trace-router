@@ -1,19 +1,11 @@
-import { combine, createEvent, createStore, Event, Store } from 'effector';
-import {
-  createMemoryHistory,
-  History,
-  parsePath,
-  PartialLocation,
-  State,
-  Update,
-} from 'history';
+import { combine, createEvent, createStore } from 'effector';
+import { createMemoryHistory, History, State, Update } from 'history';
 import { compile as createCompile, match as createMatch } from 'path-to-regexp';
 
 import {
   CompileConfig,
   Delta,
   MergedRoute,
-  ObjectAny,
   Params,
   Query,
   Route,
@@ -23,40 +15,7 @@ import {
   ToLocation,
 } from './types';
 
-export const shouldUpdate = (
-  current: ObjectAny,
-  target: ObjectAny
-): boolean => {
-  for (const key in target) {
-    // noinspection JSUnfilteredForInLoop
-    if (key in current && target[key] !== current[key]) {
-      return true;
-    }
-  }
-  return false;
-};
-
-const onImmediate = <S, T>(
-  store: Store<S>,
-  trigger: Store<T> | Event<T>,
-  reducer: (state: S, payload: T) => S
-): Store<S> => {
-  const update = createEvent<T>();
-  store.on(update, reducer);
-  trigger.watch(update);
-  return store;
-};
-
-const normalizeLocation = <S extends State = State>(
-  toLocation: ToLocation<S>
-): PartialLocation<S> => {
-  const { to, state = null } =
-    typeof toLocation === 'string'
-      ? { to: toLocation, state: null }
-      : toLocation;
-  const path = typeof to === 'string' ? parsePath(to) : to;
-  return { ...path, state: state as S };
-};
+import { shouldUpdate, normalizeLocation, onImmediate } from './utils';
 
 const createRoute = <R, P extends Params = Params>(
   router: R extends Router<infer Q, infer S> ? Router<Q, S> : never,
