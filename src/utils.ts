@@ -1,6 +1,16 @@
 import { createEvent, Event, Store } from 'effector';
-import { parsePath, PartialLocation, State } from 'history';
-import { ObjectAny, ToLocation } from './types';
+import {
+  createMemoryHistory,
+  InitialEntry,
+  Location,
+  MemoryHistory,
+  parsePath,
+  PartialLocation,
+  PartialPath,
+  State,
+} from 'history';
+
+import { ObjectAny, Query, ToLocation } from './types';
 
 export const shouldUpdate = (
   current: ObjectAny,
@@ -15,7 +25,7 @@ export const shouldUpdate = (
   return false;
 };
 
-export const onImmediate = <S, T>(
+export const reduceStore = <S, T>(
   store: Store<S>,
   trigger: Store<T> | Event<T>,
   reducer: (state: S, payload: T) => S
@@ -36,3 +46,25 @@ export const normalizeLocation = <S extends State = State>(
   const path = typeof to === 'string' ? parsePath(to) : to;
   return { ...path, state: state as S };
 };
+
+export const getQueryParams = <Q extends Query = Query>(
+  query: string[][] | string | URLSearchParams
+  // @ts-expect-error
+): Q => Object.fromEntries<string>(new URLSearchParams(query)) as Q;
+
+export const historyChanger = <S extends State = State>(
+  fn: (path: PartialPath, state?: S) => void
+) => (location: Location<S>, toLocation: ToLocation<S>): void => {
+  const newLocation = normalizeLocation<S>(toLocation);
+  if (shouldUpdate(location, newLocation)) {
+    const { state, ...path } = newLocation;
+    fn(path, state);
+  }
+};
+
+export const createHistory = <S extends State = State>(
+  root?: InitialEntry
+): MemoryHistory<S> =>
+  createMemoryHistory({
+    initialEntries: root ? [root] : undefined,
+  }) as MemoryHistory<S>;

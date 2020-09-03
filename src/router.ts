@@ -1,9 +1,13 @@
-import { combine, createEvent, createStore } from 'effector';
-import { createMemoryHistory, History, State, Update } from 'history';
-import { compile as createCompile, match as createMatch } from 'path-to-regexp';
+import { createEvent, createStore } from 'effector';
+import {
+  BrowserHistory,
+  HashHistory,
+  MemoryHistory,
+  State,
+  Update,
+} from 'history';
 
 import {
-  CompileConfig,
   Delta,
   MergedRoute,
   Params,
@@ -14,86 +18,27 @@ import {
   RouterConfig,
   ToLocation,
 } from './types';
-
-import { shouldUpdate, normalizeLocation, onImmediate } from './utils';
-
-const createRoute = <R, P extends Params = Params>(
-  router: R extends Router<infer Q, infer S> ? Router<Q, S> : never,
-  config: RouteConfig
-): Route<P, R> => {
-  const { path, matchOptions } = config;
-  const match = createMatch<P>(path, matchOptions);
-  const navigate = createEvent<P | void>();
-  const redirect = createEvent<P | void>();
-  const $params = createStore<P | null>(null);
-  const $visible = $params.map(Boolean);
-
-  onImmediate($params, router.pathname, (_, pathname) => {
-    const result = match(pathname);
-    return result ? result.params : null;
-  }).reset(router.pathname);
-
-  const compile = ({
-    params,
-    query,
-    hash,
-    options,
-  }: CompileConfig<P> = {}): string => {
-    const queryString = String(new URLSearchParams(query));
-    const pathname = createCompile<P>(config.path, options)(params);
-    const search = queryString ? `?${queryString}` : '';
-    const hashSign = !hash || hash.startsWith('#') ? '' : `#${hash}`;
-    return `${pathname}${search}${hashSign}${hash ?? ''}`;
-  };
-
-  navigate.watch(params =>
-    router.navigate(compile({ params: params as P | undefined }))
-  );
-
-  redirect.watch(params =>
-    router.redirect(compile({ params: params as P | undefined }))
-  );
-
-  return {
-    visible: $visible,
-    params: $params,
-    config,
-    compile,
-    router,
-    navigate,
-    redirect,
-  };
-};
-
-const createMergedRoute = (routes: Route[]): MergedRoute => {
-  const $someVisible = combine(
-    routes.map(route => route.visible)
-  ).map(statuses => statuses.some(Boolean));
-
-  const $visible = onImmediate(
-    createStore(false),
-    $someVisible,
-    (visible, someVisible) => visible || someVisible
-  ).reset($someVisible);
-
-  const configs = routes.map(route => route.config);
-
-  return {
-    visible: $visible,
-    routes,
-    configs,
-  };
-};
+import {
+  createHistory,
+  getQueryParams,
+  historyChanger,
+  reduceStore,
+} from './utils';
+import { createRoute, createMergedRoute } from './route';
 
 export const createRouter = <Q extends Query = Query, S extends State = State>({
   history: userHistory,
+  root,
 }: RouterConfig<S> = {}): Router<Q, S> => {
-  const history = (userHistory ?? createMemoryHistory()) as History<S>;
+  let history = userHistory! ?? createHistory<S>(root);
+
   const historyUpdated = createEvent<Update<S>>();
   const $historyUpdate = createStore<Update<S>>({
     location: history.location,
     action: history.action,
-  });
+  }).on(historyUpdated, (_, update) => update);
+
+  let unlisten = history.listen(historyUpdated);
 
   const navigate = createEvent<ToLocation<S>>();
   const redirect = createEvent<ToLocation<S>>();
@@ -108,45 +53,20 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
   const $hash = $location.map(location => location.hash);
   const $state = $location.map(location => location.state);
   const $key = $location.map(location => location.key);
-  const $resource = $location.map(
-    ({ pathname, search, hash }) => `${pathname}${search}${hash}`
-  );
-  const $query = $search.map(
-    // @ts-ignore
-    search => Object.fromEntries(new URLSearchParams(search)) as Q
-  );
+  const $href = $location.map(history.createHref);
+  const $query = $search.map<Q>(getQueryParams);
 
   const $hasMatches = createStore(false);
   const $noMatches = $hasMatches.map(hasMatches => !hasMatches);
 
-  history.listen(historyUpdated);
-
-  $location.on(historyUpdated, (_, update) => update.location);
-
-  $location.watch(navigate, (location, toLocation) => {
-    const newLocation = normalizeLocation<S>(toLocation);
-    if (shouldUpdate(location, newLocation)) {
-      const { state, ...path } = newLocation;
-      history.push(path, state);
-    }
-  });
-
-  $location.watch(redirect, (location, toLocation) => {
-    const newLocation = normalizeLocation<S>(toLocation);
-    if (shouldUpdate(location, newLocation)) {
-      const { state, ...path } = newLocation;
-      history.replace(path, state);
-    }
-  });
-
-  shift.watch(delta => {
-    history.go(delta);
-  });
+  $location.watch(navigate, historyChanger<S>(history.push));
+  $location.watch(redirect, historyChanger<S>(history.replace));
+  shift.watch(history.go);
 
   const connectRoute = <P extends Params = Params>(
     route: Route<P, unknown> | MergedRoute
   ): void => {
-    onImmediate(
+    reduceStore(
       $hasMatches,
       route.visible,
       (hasMatches, visible) => hasMatches || visible
@@ -171,8 +91,9 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
     hash: $hash,
     state: $state,
     key: $key,
-    resource: $resource,
+    href: $href,
     query: $query,
+
     hasMatches: $hasMatches,
     noMatches: $noMatches,
 
@@ -196,6 +117,18 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
       const route = createMergedRoute(routes);
       route.visible = route.visible.map(visible => !visible);
       return route;
+    },
+
+    use: (
+      givenHistory: BrowserHistory<S> | HashHistory<S> | MemoryHistory<S>
+    ) => {
+      const { location, action } = givenHistory;
+      const defaultState = { location, action };
+      $historyUpdate.defaultState = defaultState;
+      unlisten();
+      unlisten = givenHistory.listen(historyUpdated);
+      history = givenHistory;
+      historyUpdated(defaultState);
     },
   };
 

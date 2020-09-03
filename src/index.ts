@@ -1,3 +1,11 @@
 export { createRouter } from './router';
+export { createRoute, createMergedRoute } from './route';
 
-export { shouldUpdate, normalizeLocation, onImmediate } from './utils';
+export {
+  shouldUpdate,
+  reduceStore,
+  normalizeLocation,
+  getQueryParams,
+  historyChanger,
+  createHistory,
+} from './utils';

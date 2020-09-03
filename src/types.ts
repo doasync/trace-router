@@ -1,8 +1,11 @@
 import { Event, Store } from 'effector';
 import {
   Action,
+  BrowserHistory,
   Hash,
+  HashHistory,
   History,
+  InitialEntry,
   Key,
   Location,
   MemoryHistory,
@@ -34,13 +37,14 @@ export type ToLocation<S extends State = State> =
   | string
   | { to?: To; state?: S };
 export type Delta = number;
-export type Resource = string;
+export type Href = string;
 export type Pattern = string;
 export interface Query extends ObjectString {}
 export interface Params extends ObjectUnknown {}
 
-export type RouterConfig<S extends State> = {
-  history?: History<S> | MemoryHistory<S>;
+export type RouterConfig<S extends State = State> = {
+  history?: BrowserHistory<S> | HashHistory<S> | MemoryHistory<S>;
+  root?: InitialEntry;
 };
 
 export type RouteConfig = {
@@ -63,6 +67,14 @@ export type Route<P extends Params = Params, R = Router> = {
   router: R extends Router<infer Q, infer S> ? Router<Q, S> : never;
   navigate: Event<P | void>;
   redirect: Event<P | void>;
+  bind: (
+    param: keyof P,
+    bindConfig: {
+      router: Router;
+      parse?: (rawParam?: string) => string | undefined;
+      format?: (path?: string) => string | undefined;
+    }
+  ) => Route<P, R>;
 };
 
 export type MergedRoute = {
@@ -87,7 +99,7 @@ export type Router<Q extends Query = Query, S extends State = State> = {
   hash: Store<Hash>;
   state: Store<S>;
   key: Store<Key>;
-  resource: Store<Resource>;
+  href: Store<Href>;
   query: Store<Q>;
   hasMatches: Store<boolean>;
   noMatches: Store<boolean>;
@@ -96,4 +108,7 @@ export type Router<Q extends Query = Query, S extends State = State> = {
   ) => Route<P, Router<Q, S>>;
   merge: <T extends Route[]>(routes: T) => MergedRoute;
   none: <T extends Route[]>(routes: T) => MergedRoute;
+  use: (
+    givenHistory: BrowserHistory<S> | HashHistory<S> | MemoryHistory<S>
+  ) => void;
 };
