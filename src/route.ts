@@ -83,7 +83,10 @@ export const bindToRoute = <
   return route;
 };
 
-export const createRoute = <R extends Router, P extends Params = Params>(
+export const createRoute = <
+  P extends Params = Params,
+  R extends Router = Router
+>(
   router: R extends Router<infer Q, infer S> ? Router<Q, S> : never,
   config: RouteConfig
 ): Route<P, R> => {

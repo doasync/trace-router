@@ -102,7 +102,8 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
     ): Route<P, Router<Q, S>> => {
       const routeConfig =
         typeof pathConfig === 'string' ? { path: pathConfig } : pathConfig;
-      const route = createRoute<typeof router, P>(router, routeConfig);
+      // @ts-ignore
+      const route = createRoute<P, Router<Q, S>>(router, routeConfig);
       connectRoute(route);
       return route;
     },
