@@ -59,6 +59,12 @@ export type CompileConfig<P extends Params = Params> = {
   options?: ParseOptions & TokensToFunctionOptions;
 };
 
+export type BindConfig = {
+  router: Router;
+  parse?: (rawParam?: string) => string | undefined;
+  format?: (path?: string) => string | undefined;
+};
+
 export type Route<P extends Params = Params, R = Router> = {
   visible: Store<boolean>;
   params: Store<null | P>;
@@ -67,6 +73,7 @@ export type Route<P extends Params = Params, R = Router> = {
   router: R extends Router<infer Q, infer S> ? Router<Q, S> : never;
   navigate: Event<P | void>;
   redirect: Event<P | void>;
+  bindings: Partial<{ [K in keyof P]: BindConfig }>;
   bind: (
     param: keyof P,
     bindConfig: {

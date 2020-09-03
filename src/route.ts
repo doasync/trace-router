@@ -1,6 +1,8 @@
 import { combine, createEvent, createStore } from 'effector';
 import { compile as createCompile, match as createMatch } from 'path-to-regexp';
+
 import {
+  BindConfig,
   CompileConfig,
   MergedRoute,
   Params,
@@ -14,6 +16,7 @@ export const createRoute = <R, P extends Params = Params>(
   router: R extends Router<infer Q, infer S> ? Router<Q, S> : never,
   config: RouteConfig
 ): Route<P, R> => {
+  const bindings: Partial<{ [K in keyof P]: BindConfig }> = {};
   const { path, matchOptions } = config;
   const match = createMatch<P>(path, matchOptions);
   const navigate = createEvent<P | void>();
@@ -33,6 +36,19 @@ export const createRoute = <R, P extends Params = Params>(
     options,
   }: CompileConfig<P> = {}): string => {
     const queryString = String(new URLSearchParams(query));
+
+    if (params) {
+      const paramsNames = Object.keys(params) as Array<keyof P>;
+      for (const paramName of paramsNames) {
+        if (paramName in bindings) {
+          const { format } = bindings[paramName] as BindConfig;
+          params[paramName] = format
+            ? (format(String(params[paramName])) as P[keyof P])
+            : params[paramName];
+        }
+      }
+    }
+
     const pathname = createCompile<P>(path, options)(params);
     const search = queryString ? `?${queryString}` : '';
     const hashSign = !hash || hash.startsWith('#') ? '' : `#${hash}`;
@@ -55,15 +71,14 @@ export const createRoute = <R, P extends Params = Params>(
     router,
     navigate,
     redirect,
-    bind: (
-      paramName,
-      bindConfig: {
-        router: Router;
-        parse?: (rawParam?: string) => string | undefined;
-        format?: (path?: string) => string | undefined;
-      }
-    ) => {
+    bindings,
+    bind: (paramName, bindConfig: BindConfig) => {
       const { router: childRouter, parse, format } = bindConfig;
+      if (bindings[paramName]) {
+        throw new Error(`"${String(paramName)}" is already bound`);
+      }
+
+      bindings[paramName] = bindConfig;
 
       combine([$visible, childRouter.pathname]).watch(
         $params,
