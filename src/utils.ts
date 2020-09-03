@@ -68,3 +68,7 @@ export const createHistory = <S extends State = State>(
   createMemoryHistory({
     initialEntries: root ? [root] : undefined,
   }) as MemoryHistory<S>;
+
+export const throwError = (message: string): never => {
+  throw new Error(message);
+};

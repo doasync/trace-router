@@ -10,9 +10,80 @@ import {
   RouteConfig,
   Router,
 } from './types';
-import { reduceStore } from './utils';
+import { reduceStore, throwError } from './utils';
 
-export const createRoute = <R, P extends Params = Params>(
+export const compileRoute = <
+  P extends Params = Params,
+  R extends Router = Router
+>(
+  route: Route<P, R>,
+  { params, query, hash, options }: CompileConfig<P> = {}
+): string => {
+  const queryString = String(new URLSearchParams(query));
+
+  if (params) {
+    const paramsNames = Object.keys(params) as Array<keyof P>;
+    for (const paramName of paramsNames) {
+      if (paramName in route.bindings) {
+        const { format } = route.bindings[paramName] as BindConfig;
+        params[paramName] = format
+          ? (format(String(params[paramName])) as P[keyof P])
+          : params[paramName];
+      }
+    }
+  }
+
+  const pathname = createCompile<P>(route.config.path, options)(params);
+  const search = queryString ? `?${queryString}` : '';
+  const hashSign = !hash || hash.startsWith('#') ? '' : `#${hash}`;
+  return `${pathname}${search}${hashSign}${hash ?? ''}`;
+};
+
+export const bindToRoute = <
+  P extends Params = Params,
+  R extends Router = Router
+>(
+  route: Route<P, R>,
+  { paramName, bindConfig }: { paramName: keyof P; bindConfig: BindConfig }
+): Route<P, R> => {
+  const { router: childRouter, parse } = bindConfig;
+  if (route.bindings[paramName])
+    throwError(`"${String(paramName)}" is already bound`);
+
+  route.bindings[paramName] = bindConfig;
+
+  combine([route.visible, childRouter.pathname]).watch(
+    route.params,
+    ([visible, childPath], params) => {
+      const param = parse
+        ? parse(params?.[paramName] as string)
+        : (params?.[paramName] as string);
+      if (visible && param !== childPath) {
+        if (param) {
+          childRouter.navigate(param);
+          return;
+        }
+        const newParams: P = { ...(params as P), [paramName]: childPath };
+        route.router.redirect(
+          compileRoute<P, R>(route, { params: newParams })
+        );
+      }
+    }
+  );
+
+  route.params.on(childRouter.pathname, (params, childPath) => {
+    if (params?.[paramName] !== childPath) {
+      const newParams: P = { ...(params as P), [paramName]: childPath };
+      route.router.navigate(
+        compileRoute<P, R>(route, { params: newParams })
+      );
+    }
+  });
+
+  return route;
+};
+
+export const createRoute = <R extends Router, P extends Params = Params>(
   router: R extends Router<infer Q, infer S> ? Router<Q, S> : never,
   config: RouteConfig
 ): Route<P, R> => {
@@ -29,86 +100,31 @@ export const createRoute = <R, P extends Params = Params>(
     return result ? result.params : null;
   });
 
-  const compile = ({
-    params,
-    query,
-    hash,
-    options,
-  }: CompileConfig<P> = {}): string => {
-    const queryString = String(new URLSearchParams(query));
-
-    if (params) {
-      const paramsNames = Object.keys(params) as Array<keyof P>;
-      for (const paramName of paramsNames) {
-        if (paramName in bindings) {
-          const { format } = bindings[paramName] as BindConfig;
-          params[paramName] = format
-            ? (format(String(params[paramName])) as P[keyof P])
-            : params[paramName];
-        }
-      }
-    }
-
-    const pathname = createCompile<P>(path, options)(params);
-    const search = queryString ? `?${queryString}` : '';
-    const hashSign = !hash || hash.startsWith('#') ? '' : `#${hash}`;
-    return `${pathname}${search}${hashSign}${hash ?? ''}`;
-  };
-
-  navigate.watch(params =>
-    router.navigate(compile({ params: params as P | undefined }))
-  );
-
-  redirect.watch(params =>
-    router.redirect(compile({ params: params as P | undefined }))
-  );
-
   const route: Route<P, R> = {
     visible: $visible,
     params: $params,
     config,
-    compile,
     router,
     navigate,
     redirect,
     bindings,
-    bind: (paramName, bindConfig: BindConfig) => {
-      const { router: childRouter, parse, format } = bindConfig;
-      if (bindings[paramName]) {
-        throw new Error(`"${String(paramName)}" is already bound`);
-      }
-
-      bindings[paramName] = bindConfig;
-
-      combine([$visible, childRouter.pathname]).watch(
-        $params,
-        ([visible, childPath], params) => {
-          const param = parse
-            ? parse(params?.[paramName] as string)
-            : (params?.[paramName] as string);
-          if (visible && param !== childPath) {
-            if (param) {
-              childRouter.navigate(param);
-              return;
-            }
-            const rawParam = format ? format(childPath) : childPath;
-            const newParams: P = { ...(params as P), [paramName]: rawParam };
-            router.redirect(compile({ params: newParams }));
-          }
-        }
-      );
-
-      $params.on(childRouter.pathname, (params, childPath) => {
-        const rawParam = format ? format(childPath) : childPath;
-        if (params?.[paramName] !== rawParam) {
-          const newParams: P = { ...(params as P), [paramName]: rawParam };
-          router.navigate(compile({ params: newParams }));
-        }
-      });
-
-      return route;
-    },
+    compile: (compileConfig?: CompileConfig<P>): string =>
+      compileRoute<P, R>(route, compileConfig),
+    bind: (paramName: keyof P, bindConfig: BindConfig): Route<P, R> =>
+      bindToRoute<P, R>(route, { paramName, bindConfig }),
   };
+
+  navigate.watch(params =>
+    router.navigate(
+      compileRoute<P, R>(route, { params: params as P | undefined })
+    )
+  );
+
+  redirect.watch(params =>
+    router.redirect(
+      compileRoute<P, R>(route, { params: params as P | undefined })
+    )
+  );
 
   return route;
 };
