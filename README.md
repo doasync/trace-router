@@ -1,3 +1,12 @@
+[![NPM Version][npm-image]][npm-url] ![NPM Downloads][downloads-image] [![GitHub issues][issues-image]][issues-url]
+
+[npm-image]: https://img.shields.io/npm/v/trace-router.svg
+[npm-url]: https://www.npmjs.com/package/trace-router
+[downloads-image]: https://img.shields.io/npm/dw/trace-router.svg
+[deps-image]: https://david-dm.org/doasync/trace-router.svg
+[issues-image]: https://img.shields.io/github/issues/doasync/trace-router.svg
+[issues-url]: https://github.com/doasync/trace-router/issues
+
 # Trace Router
 
 The next generation router for your app
@@ -47,7 +56,7 @@ exactRoot.visible.watch(visible => {
 });
 ```
 
-Use routes in React (`trace-router-react`):
+Use routes in React (`trace-router-react` package):
 
 ```jsx
 export const Root = () => (
@@ -278,6 +287,8 @@ export type MergedRoute = {
 
 </details>
 
-### Docs
+### Repo
 
-See the source code ;)
+Give `trace-router` a star!
+
+GitHub ★: https://github.com/doasync/trace-router
