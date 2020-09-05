@@ -30,7 +30,7 @@ export interface ObjectUnknown {
   [key: string]: unknown;
 }
 export interface ObjectString {
-  [key: string]: unknown;
+  [key: string]: string;
 }
 
 export type ToLocation<S extends State = State> =
