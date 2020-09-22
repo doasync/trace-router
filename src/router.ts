@@ -7,6 +7,7 @@ import {
   Update,
 } from 'history';
 
+import { createMergedRoute, createRoute } from './route';
 import {
   Delta,
   MergedRoute,
@@ -24,7 +25,6 @@ import {
   historyChanger,
   reduceStore,
 } from './utils';
-import { createRoute, createMergedRoute } from './route';
 
 export const createRouter = <Q extends Query = Query, S extends State = State>({
   history: userHistory,
@@ -102,7 +102,7 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
     ): Route<P, Router<Q, S>> => {
       const routeConfig =
         typeof pathConfig === 'string' ? { path: pathConfig } : pathConfig;
-      // @ts-ignore
+      // @ts-expect-error
       const route = createRoute<P, Router<Q, S>>(router, routeConfig);
       connectRoute(route);
       return route;

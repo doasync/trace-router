@@ -35,7 +35,7 @@ export const compileRoute = <
 
   const pathname = createCompile<P>(route.config.path, options)(params);
   const search = queryString ? `?${queryString}` : '';
-  const hashSign = !hash || hash.startsWith('#') ? '' : `#${hash}`;
+  const hashSign = !hash || hash.startsWith('#') ? '' : `#`;
   return `${pathname}${search}${hashSign}${hash ?? ''}`;
 };
 
