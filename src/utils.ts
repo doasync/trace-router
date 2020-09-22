@@ -44,7 +44,8 @@ export const normalizeLocation = <S extends State = State>(
       ? { to: toLocation, state: null }
       : toLocation;
   const path = typeof to === 'string' ? parsePath(to) : to;
-  return { ...path, state: state as S };
+  const { pathname = '', search = '', hash = '' } = path ?? {};
+  return { pathname, search, hash, state: state as S };
 };
 
 export const getQueryParams = <Q extends Query = Query>(
