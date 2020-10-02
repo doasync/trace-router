@@ -21,6 +21,7 @@ import {
   TokensToFunctionOptions,
   TokensToRegexpOptions,
 } from 'path-to-regexp';
+export { ParseOptions, TokensToFunctionOptions };
 
 export interface ObjectAny {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

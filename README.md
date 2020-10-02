@@ -22,6 +22,7 @@ yarn add effector trace-router
 Create a router:
 
 ```js
+import history from 'history/browser';
 import { createRouter, history } from 'trace-router';
 
 export const router = createRouter({ history });
