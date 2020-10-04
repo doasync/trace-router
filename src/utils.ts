@@ -1,4 +1,4 @@
-import { createEvent, Event, Store } from 'effector';
+import { createEvent, Event, sample, Store } from 'effector';
 import {
   createMemoryHistory,
   InitialEntry,
@@ -31,8 +31,14 @@ export const reduceStore = <S, T>(
   reducer: (state: S, payload: T) => S
 ): Store<S> => {
   const update = createEvent<T>();
+  const init = createEvent();
   store.on(update, reducer);
-  trigger.watch(update);
+  sample({
+    source: trigger,
+    clock: [trigger, init],
+    target: update,
+  });
+  init();
   return store;
 };
 
@@ -55,7 +61,13 @@ export const getQueryParams = <Q extends Query = Query>(
 
 export const historyChanger = <S extends State = State>(
   fn: (path: PartialPath, state?: S) => void
-) => (location: Location<S>, toLocation: ToLocation<S>): void => {
+) => ({
+  location,
+  toLocation,
+}: {
+  location: Location<S>;
+  toLocation: ToLocation<S>;
+}): void => {
   const newLocation = normalizeLocation<S>(toLocation);
   if (shouldUpdate(location, newLocation)) {
     const { state, ...path } = newLocation;
