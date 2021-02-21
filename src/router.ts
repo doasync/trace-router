@@ -59,6 +59,12 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
   const $hasMatches = createStore(false);
   const $noMatches = $hasMatches.map(hasMatches => !hasMatches);
 
+  const notFoundRoute: MergedRoute = {
+    visible: $noMatches,
+    routes: [],
+    configs: [],
+  };
+
   sample({
     source: $location,
     clock: navigate,
@@ -111,6 +117,8 @@ export const createRouter = <Q extends Query = Query, S extends State = State>({
 
     hasMatches: $hasMatches,
     noMatches: $noMatches,
+
+    notFoundRoute,
 
     add: <P extends Params = Params>(
       pathConfig: string | RouteConfig
