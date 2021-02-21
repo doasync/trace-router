@@ -111,6 +111,7 @@ export type Router<Q extends Query = Query, S extends State = State> = {
   query: Store<Q>;
   hasMatches: Store<boolean>;
   noMatches: Store<boolean>;
+  notFoundRoute: MergedRoute;
   add: <P extends Params = Params>(
     pathConfig: Pattern | RouteConfig
   ) => Route<P, Router<Q, S>>;
